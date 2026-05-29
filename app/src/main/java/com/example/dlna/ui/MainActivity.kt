@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.IBinder
 import android.widget.Button
 import android.widget.TextView
+import com.example.dlna.R
 import com.example.dlna.dlna.DLNAController
 import com.example.dlna.service.CaptureService
 import org.fourthline.cling.android.AndroidUpnpService
