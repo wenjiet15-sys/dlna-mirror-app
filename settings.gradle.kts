@@ -10,7 +10,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://4thline.org/m2") } // For Cling
+        maven { url = uri("http://4thline.org/m2") }
+        maven { url = uri("https://jitpack.io") }
     }
 }
 rootProject.name = "DLNAMirroring"
