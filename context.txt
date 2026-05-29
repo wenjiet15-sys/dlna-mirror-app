@@ -1,0 +1,4 @@
+User chose option 2: Focus on full pipeline architecture and code-level optimization with low-latency encoding configuration, accepting that TV-side buffering may vary.
+User chose option 1: Android platform with MediaProjection, MediaCodec, NanoHTTPD and Cling.
+User needs to see concrete results but doesn't have Android Studio installed.
+User wants to know how to actually run/test the app and if they can cast their phone right now.

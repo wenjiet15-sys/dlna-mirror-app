@@ -15,7 +15,7 @@
         android:label="DLNA Mirror"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.DarkActionBar"
+        android:theme="@style/Theme.DLNAMirror"
         android:usesCleartextTraffic="true">
         
         <activity
