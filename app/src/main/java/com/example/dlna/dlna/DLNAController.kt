@@ -2,20 +2,16 @@ package com.example.dlna.dlna
 
 import android.util.Log
 import org.fourthline.cling.UpnpService
-import org.fourthline.cling.UpnpServiceImpl
-import org.fourthline.cling.controlpoint.ActionCallback
+import org.fourthline.cling.android.AndroidUpnpServiceImpl
 import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
 import org.fourthline.cling.model.meta.Device
 import org.fourthline.cling.support.avtransport.callback.Play
 import org.fourthline.cling.support.avtransport.callback.SetAVTransportURI
 
-class DLNAController {
-    // 这里需在 Android 线程或者后台 Service 里初始化绑定
-    val upnpService: UpnpService = UpnpServiceImpl()
+class DLNAController(private val upnpService: UpnpService) {
 
     fun searchDevices() {
-        // 向局域网广播 SSDP，发现电视机
         upnpService.controlPoint.search()
     }
 
