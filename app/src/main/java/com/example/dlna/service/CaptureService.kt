@@ -18,6 +18,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.example.dlna.encoder.AudioEncoder
+import com.example.dlna.encoder.TSMuxerProxy
 import com.example.dlna.encoder.VideoEncoder
 import com.example.dlna.server.StreamServer
 import java.io.PipedInputStream
@@ -32,6 +33,7 @@ class CaptureService : Service() {
     private val videoEncoder = VideoEncoder()
     private val audioEncoder = AudioEncoder()
     private var streamServer: StreamServer? = null
+    private var tsMuxer: TSMuxerProxy? = null
     
     // 内存管道，编码后的数据直通 HttpServer
     private val outputStream = PipedOutputStream()
@@ -42,6 +44,9 @@ class CaptureService : Service() {
         super.onCreate()
         createNotificationChannel()
         startForeground(1, buildNotification())
+        
+        // 初始化轻量级 TS Muxer 壳，对接管道
+        tsMuxer = TSMuxerProxy(outputStream)
         
         // 启动本地 Http Server (端口 8080)
         streamServer = StreamServer(8080).apply {
@@ -58,12 +63,19 @@ class CaptureService : Service() {
             val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
             
-            // 组装连线: 视频和音频出流后，进入 TS Muxer 
-            videoEncoder.onDataAvailable = { h264Data ->
-                // 这里调用 TsMuxer (伪代码)
+            // --- 将音视频硬编码出来的 Byte 流灌入 TS Muxer ---
+            videoEncoder.onFormatChanged = { format ->
+                tsMuxer?.addTrack(format, true)
             }
-            audioEncoder.onDataAvailable = { aacData ->
-                // 这里调用 TsMuxer (伪代码)
+            videoEncoder.onDataAvailable = { buffer, info ->
+                tsMuxer?.writeSampleData(true, buffer, info)
+            }
+            
+            audioEncoder.onFormatChanged = { format ->
+                tsMuxer?.addTrack(format, false)
+            }
+            audioEncoder.onDataAvailable = { buffer, info ->
+                tsMuxer?.writeSampleData(false, buffer, info)
             }
             
             startCapture()
@@ -132,15 +144,16 @@ class CaptureService : Service() {
         isRecording = false
         audioRecord?.stop()
         audioRecord?.release()
+        
         audioEncoder.stop()
         
         virtualDisplay?.release()
         mediaProjection?.stop()
         videoEncoder.stop()
         
+        tsMuxer?.release()
         streamServer?.stop()
-        outputStream.close()
-        inputStream.close()
+        
         super.onDestroy()
     }
 
@@ -156,7 +169,7 @@ class CaptureService : Service() {
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, "DLNA_CHANNEL")
             .setContentTitle("DLNA 镜像中")
-            .setContentText("正在录制屏幕及系统音频并投射...")
+            .setContentText("正在录制屏幕及系统音频并推流...")
             .build()
     }
 }

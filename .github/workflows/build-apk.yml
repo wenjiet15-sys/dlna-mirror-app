@@ -1,0 +1,48 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # 允许手动在网页端点击触发
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17' # Android Gradle Plugin 8.x 需要 Java 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+        # 如果你本地没有提交 gradlew 脚本，这里会用全局 gradle 替代，但最好在项目中先跑 `gradle wrapper`
+        continue-on-error: true 
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+        # 如果 ./gradlew 没找到，就回退到全局命令
+        continue-on-error: true
+
+      - name: Fallback Build Debug APK (if wrapper is missing)
+        if: steps.build.outcome != 'success'
+        run: gradle assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlna-mirror-app
+          path: app/build/outputs/apk/debug/app-debug.apk
