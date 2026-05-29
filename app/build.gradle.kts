@@ -28,6 +28,22 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/beans.xml",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0",
+                "META-INF/*.kotlin_module"
+            )
+        }
+    }
     buildFeatures {
         viewBinding = true
     }
@@ -36,6 +52,10 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("org.eclipse.jetty:jetty-server:8.1.21.v20160908")
+    implementation("org.eclipse.jetty:jetty-servlet:8.1.21.v20160908")
+    implementation("org.eclipse.jetty:jetty-client:8.1.21.v20160908")
+    implementation("org.slf4j:slf4j-jdk14:1.7.25")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     
     // NanoHTTPD
