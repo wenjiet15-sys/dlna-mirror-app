@@ -52,9 +52,11 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
+    // Jetty (Cling 所需，在 Android 10+ 需包含 servlet-api)
     implementation("org.eclipse.jetty:jetty-server:8.1.21.v20160908")
     implementation("org.eclipse.jetty:jetty-servlet:8.1.21.v20160908")
     implementation("org.eclipse.jetty:jetty-client:8.1.21.v20160908")
+    implementation("javax.servlet:javax.servlet-api:3.1.0")
     implementation("org.slf4j:slf4j-jdk14:1.7.25")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     
