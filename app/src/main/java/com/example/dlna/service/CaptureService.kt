@@ -8,11 +8,16 @@ import android.content.Context
 import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioPlaybackCaptureConfiguration
+import android.media.AudioRecord
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.example.dlna.encoder.AudioEncoder
 import com.example.dlna.encoder.VideoEncoder
 import com.example.dlna.server.StreamServer
 import java.io.PipedInputStream
@@ -21,14 +26,17 @@ import java.io.PipedOutputStream
 class CaptureService : Service() {
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
+    private var audioRecord: AudioRecord? = null
     
     // 编码器与推流服务
     private val videoEncoder = VideoEncoder()
+    private val audioEncoder = AudioEncoder()
     private var streamServer: StreamServer? = null
     
     // 内存管道，编码后的数据直通 HttpServer
     private val outputStream = PipedOutputStream()
     private val inputStream = PipedInputStream(outputStream)
+    private var isRecording = false
 
     override fun onCreate() {
         super.onCreate()
@@ -50,10 +58,12 @@ class CaptureService : Service() {
             val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
             
-            // 组装连线: 编码器出的 Nal 数据通过 Muxer(此处用伪代码简写) 写入管道
+            // 组装连线: 视频和音频出流后，进入 TS Muxer 
             videoEncoder.onDataAvailable = { h264Data ->
-                // [工业实现重点]: 这里需要调用 TsMuxer 把 H264 打成 TS 后再 write
-                // outputStream.write(tsData) 
+                // 这里调用 TsMuxer (伪代码)
+            }
+            audioEncoder.onDataAvailable = { aacData ->
+                // 这里调用 TsMuxer (伪代码)
             }
             
             startCapture()
@@ -62,28 +72,72 @@ class CaptureService : Service() {
     }
 
     private fun startCapture() {
-        val dm = resources.displayMetrics
-        val width = dm.widthPixels
-        val height = dm.heightPixels
-        val dpi = dm.densityDpi
+        // [严格达标]: 强制 1080P (1920x1080), 8Mbps, 30fps
+        val width = 1920
+        val height = 1080
+        val dpi = resources.displayMetrics.densityDpi
 
-        // 配置编码器 1080P, 8Mbps, 30fps
-        videoEncoder.prepare(width, height, 8000000, 30) 
+        videoEncoder.prepare(width, height, 8000000, 30) // 8Mbps
         videoEncoder.start()
+        
+        // [严格达标]: 强制 128Kbps 音频
+        audioEncoder.prepare(44100, 128000, 2)
+        audioEncoder.start()
 
-        // 开始捕获屏幕
+        // 视频：捕获屏幕
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "ScreenCapture",
             width, height, dpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             videoEncoder.inputSurface, null, null
         )
+        
+        // 音频：捕获应用内声音 (Android 10+ 提供 AudioPlaybackCapture)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mediaProjection != null) {
+            val audioFormat = AudioFormat.Builder()
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setSampleRate(44100)
+                .setChannelMask(AudioFormat.CHANNEL_IN_STEREO)
+                .build()
+                
+            val audioCaptureConfig = AudioPlaybackCaptureConfiguration.Builder(mediaProjection!!)
+                .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                .addMatchingUsage(AudioAttributes.USAGE_GAME)
+                .build()
+                
+            val minBufferSize = AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT)
+            audioRecord = AudioRecord.Builder()
+                .setAudioFormat(audioFormat)
+                .setBufferSizeInBytes(minBufferSize * 2)
+                .setAudioPlaybackCaptureConfig(audioCaptureConfig)
+                .build()
+                
+            isRecording = true
+            audioRecord?.startRecording()
+            
+            // 另起线程读取 PCM 并塞给 AudioEncoder
+            Thread {
+                val buffer = ByteArray(minBufferSize)
+                while (isRecording) {
+                    val readResult = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                    if (readResult > 0) {
+                        audioEncoder.encodePcmData(buffer, readResult)
+                    }
+                }
+            }.start()
+        }
     }
 
     override fun onDestroy() {
+        isRecording = false
+        audioRecord?.stop()
+        audioRecord?.release()
+        audioEncoder.stop()
+        
         virtualDisplay?.release()
         mediaProjection?.stop()
         videoEncoder.stop()
+        
         streamServer?.stop()
         outputStream.close()
         inputStream.close()
@@ -92,7 +146,6 @@ class CaptureService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // 录屏需要前台服务
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel("DLNA_CHANNEL", "Screen Capture", NotificationManager.IMPORTANCE_LOW)
@@ -103,7 +156,7 @@ class CaptureService : Service() {
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, "DLNA_CHANNEL")
             .setContentTitle("DLNA 镜像中")
-            .setContentText("正在录制屏幕并投射...")
+            .setContentText("正在录制屏幕及系统音频并投射...")
             .build()
     }
 }
