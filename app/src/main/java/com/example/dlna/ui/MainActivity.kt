@@ -1,13 +1,3 @@
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
-import android.media.projection.MediaProjectionManager
-import android.net.wifi.WifiManager
-import android.os.Bundle
-import android.os.Build
-import android.util.Log
-import android.widget.Button
-import android.widget.TextView
 package com.example.dlna.ui
 
 import android.app.Activity
@@ -16,6 +6,7 @@ import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.os.Build
 import android.util.Log
 import android.widget.Button
 import android.widget.TextView
@@ -61,7 +52,11 @@ class MainActivity : Activity() {
                 putExtra("RESULT_CODE", resultCode)
                 putExtra("RESULT_DATA", data)
             }
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) { startForegroundService(intent) } else { startService(intent) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
+                startForegroundService(intent) 
+            } else { 
+                startService(intent) 
+            }
         }
     }
     
